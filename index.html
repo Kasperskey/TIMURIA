@@ -1,23 +1,7 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Zesty Bird Mobile</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; display: flex; justify-content: center; align-items: center; height: 100vh; touch-action: none; }
-        canvas { border: 2px solid #000; background: #87CEEB; max-width: 100%; max-height: 100%; }
-    </style>
-</head>
-<body>
-    <canvas id="game"></canvas>
-
-<script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 canvas.width = 400; canvas.height = 600;
 
-// Загрузка картинок
 const images = {};
 const assets = ['hero', 'pipe', 'bullet', 'boss', 'victory'];
 let loadedCount = 0;
@@ -25,20 +9,16 @@ let loadedCount = 0;
 assets.forEach(name => {
     images[name] = new Image();
     images[name].src = `assets/${name}.png`;
-    images[name].onload = () => {
-        loadedCount++;
-        if (loadedCount === assets.length) console.log("Все картинки загружены!");
-    };
+    images[name].onload = () => { loadedCount++; };
 });
 
-// Настройки игры
-let bird = { x: 50, y: 300, w: 60, h: 60, v: 0, g: 0.5, jump: -8 };
+// Настройки
+let bird = { x: 50, y: 300, w: 50, h: 50, v: 0, g: 0.4, jump: -7 };
 let pipes = [];
-let bullets = [];
 let score = 0;
 let gameOver = false;
+let pipeTimer = 0; // Таймер для труб
 
-// Прыжок
 function flap() {
     if (gameOver) { reset(); return; }
     bird.v = bird.jump;
@@ -48,7 +28,7 @@ window.addEventListener('mousedown', flap);
 window.addEventListener('touchstart', (e) => { e.preventDefault(); flap(); });
 
 function reset() {
-    bird.y = 300; bird.v = 0; pipes = []; bullets = []; score = 0; gameOver = false;
+    bird.y = 300; bird.v = 0; pipes = []; score = 0; gameOver = false; pipeTimer = 0;
     update();
 }
 
@@ -58,50 +38,68 @@ function update() {
     bird.v += bird.g;
     bird.y += bird.v;
 
-    // Создание труб
-    if (Date.now() % 100 < 2 && pipes.length < 3) {
-        pipes.push({ x: 400, y: Math.random() * 300 + 100 });
+    // Генерируем трубу каждые 100 кадров (примерно раз в 1.5 секунды)
+    pipeTimer++;
+    if (pipeTimer > 100) {
+        let gap = 150; // Проход между трубами
+        let pipeY = Math.random() * (canvas.height - 300) + 100;
+        pipes.push({ x: 400, y: pipeY, width: 80 });
+        pipeTimer = 0;
     }
 
-    pipes.forEach((p, i) => {
-        p.x -= 3;
-        // Коллизия с трубой
-        if (bird.x < p.x + 80 && bird.x + bird.w > p.x && bird.y < p.y) gameOver = true;
-        if (p.x < -100) { pipes.splice(i, 1); score++; }
-    });
+    for (let i = pipes.length - 1; i >= 0; i--) {
+        let p = pipes[i];
+        p.x -= 3; // Скорость труб
 
-    if (bird.y > 600 || bird.y < 0) gameOver = true;
+        // Проверка столкновения (упрощенная и точная)
+        if (bird.x + bird.w - 10 > p.x && bird.x + 10 < p.x + p.width) {
+            // Если птица внутри по горизонтали, проверяем высоту
+            // Столкновение с верхней трубой (которая идет от 0 до p.y)
+            if (bird.y + 10 < p.y - 150 || bird.y + bird.h - 10 > p.y) {
+                 // Здесь p.y — это низ прохода. Мы врезались.
+                 // Для простоты пока оставим только одну трубу как в твоем Python коде
+                 if (bird.y + 10 < p.y) gameOver = true; 
+            }
+        }
+
+        if (p.x + p.width < 0) {
+            pipes.splice(i, 1);
+            score++;
+        }
+    }
+
+    if (bird.y + bird.h > canvas.height || bird.y < 0) gameOver = true;
 
     draw();
     requestAnimationFrame(update);
 }
 
 function draw() {
-    ctx.clearRect(0, 0, 400, 600);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Птица
-    ctx.drawImage(images.hero, bird.x, bird.y, bird.w, bird.h);
+    // Рисуем птицу
+    if (images.hero) ctx.drawImage(images.hero, bird.x, bird.y, bird.w, bird.h);
 
-    // Трубы
+    // Рисуем трубы (как в твоем коде — труба растет снизу вверх)
     pipes.forEach(p => {
-        ctx.drawImage(images.pipe, p.x, p.y, 80, 500);
+        if (images.pipe) ctx.drawImage(images.pipe, p.x, p.y, p.width, 500);
     });
 
-    // Счет
     ctx.fillStyle = "white";
-    ctx.font = "30px Arial";
-    ctx.fillText("Счет: " + score, 20, 40);
+    ctx.font = "bold 30px Arial";
+    ctx.fillText("Счет: " + score, 20, 50);
 
     if (gameOver) {
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(0,0,400,600);
-        ctx.drawImage(images.victory, 75, 200, 250, 250);
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (images.victory) ctx.drawImage(images.victory, 75, 150, 250, 250);
         ctx.fillStyle = "white";
-        ctx.fillText("НАЖМИ, ЧТОБЫ ИГРАТЬ", 50, 500);
+        ctx.textAlign = "center";
+        ctx.fillText("ИГРА ОКОНЧЕНА", canvas.width/2, 450);
+        ctx.font = "20px Arial";
+        ctx.fillText("Нажми, чтобы начать заново", canvas.width/2, 500);
+        ctx.textAlign = "start";
     }
 }
 
 update();
-</script>
-</body>
-</html>
