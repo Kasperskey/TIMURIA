@@ -13,11 +13,17 @@ assets.forEach(name => {
 });
 
 // Настройки
-let bird = { x: 50, y: 300, w: 50, h: 50, v: 0, g: 0.4, jump: -7 };
-let pipes = [];
-let score = 0;
-let gameOver = false;
-let pipeTimer = 0; // Таймер для труб
+let bird, pipes, score, gameOver, pipeTimer;
+
+function reset() {
+    bird = { x: 50, y: 300, w: 50, h: 50, v: 0, g: 0.4, jump: -8 };
+    pipes = [];
+    score = 0;
+    gameOver = false;
+    pipeTimer = 0;
+}
+
+reset(); // Инициализация при запуске
 
 function flap() {
     if (gameOver) { reset(); return; }
@@ -27,48 +33,46 @@ function flap() {
 window.addEventListener('mousedown', flap);
 window.addEventListener('touchstart', (e) => { e.preventDefault(); flap(); });
 
-function reset() {
-    bird.y = 300; bird.v = 0; pipes = []; score = 0; gameOver = false; pipeTimer = 0;
-    update();
-}
-
 function update() {
-    if (gameOver) return;
+    if (gameOver) {
+        draw();
+        requestAnimationFrame(update);
+        return;
+    }
 
     bird.v += bird.g;
     bird.y += bird.v;
 
-    // Генерируем трубу каждые 100 кадров (примерно раз в 1.5 секунды)
+    // Создаем трубы каждые 120 кадров (~2 секунды)
     pipeTimer++;
-    if (pipeTimer > 100) {
-        let gap = 150; // Проход между трубами
-        let pipeY = Math.random() * (canvas.height - 300) + 100;
-        pipes.push({ x: 400, y: pipeY, width: 80 });
+    if (pipeTimer > 120) {
+        let pipeHeight = Math.random() * 200 + 100; // Высота нижней трубы
+        pipes.push({ x: 400, y: 600 - pipeHeight, w: 70, h: 500 });
         pipeTimer = 0;
     }
 
     for (let i = pipes.length - 1; i >= 0; i--) {
-        let p = pipes[i];
-        p.x -= 3; // Скорость труб
+        pipes[i].x -= 3;
 
-        // Проверка столкновения (упрощенная и точная)
-        if (bird.x + bird.w - 10 > p.x && bird.x + 10 < p.x + p.width) {
-            // Если птица внутри по горизонтали, проверяем высоту
-            // Столкновение с верхней трубой (которая идет от 0 до p.y)
-            if (bird.y + 10 < p.y - 150 || bird.y + bird.h - 10 > p.y) {
-                 // Здесь p.y — это низ прохода. Мы врезались.
-                 // Для простоты пока оставим только одну трубу как в твоем Python коде
-                 if (bird.y + 10 < p.y) gameOver = true; 
+        // Проверка столкновения
+        let p = pipes[i];
+        if (bird.x + bird.w - 10 > p.x && bird.x + 10 < p.x + p.w) {
+            if (bird.y + bird.h - 10 > p.y) {
+                gameOver = true;
             }
         }
 
-        if (p.x + p.width < 0) {
+        // Удаление труб и счет
+        if (p.x + p.w < 0) {
             pipes.splice(i, 1);
             score++;
         }
     }
 
-    if (bird.y + bird.h > canvas.height || bird.y < 0) gameOver = true;
+    // Смерть от падения или вылета вверх
+    if (bird.y + bird.h > canvas.height || bird.y < -50) {
+        gameOver = true;
+    }
 
     draw();
     requestAnimationFrame(update);
@@ -77,27 +81,32 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Рисуем птицу
+    // Птица
     if (images.hero) ctx.drawImage(images.hero, bird.x, bird.y, bird.w, bird.h);
 
-    // Рисуем трубы (как в твоем коде — труба растет снизу вверх)
+    // Трубы
     pipes.forEach(p => {
-        if (images.pipe) ctx.drawImage(images.pipe, p.x, p.y, p.width, 500);
+        if (images.pipe) ctx.drawImage(images.pipe, p.x, p.y, p.w, p.h);
     });
 
+    // Счет
     ctx.fillStyle = "white";
-    ctx.font = "bold 30px Arial";
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.font = "bold 40px Arial";
+    ctx.strokeText("Счет: " + score, 20, 50);
     ctx.fillText("Счет: " + score, 20, 50);
 
     if (gameOver) {
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        if (images.victory) ctx.drawImage(images.victory, 75, 150, 250, 250);
+        if (images.victory) ctx.drawImage(images.victory, 75, 120, 250, 250);
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
-        ctx.fillText("ИГРА ОКОНЧЕНА", canvas.width/2, 450);
+        ctx.font = "bold 30px Arial";
+        ctx.fillText("ИГРА ОКОНЧЕНА", canvas.width/2, 420);
         ctx.font = "20px Arial";
-        ctx.fillText("Нажми, чтобы начать заново", canvas.width/2, 500);
+        ctx.fillText("Нажми, чтобы начать заново", canvas.width/2, 470);
         ctx.textAlign = "start";
     }
 }
