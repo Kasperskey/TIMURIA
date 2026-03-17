@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Zesty Bird Mobile</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87CEEB; display: flex; justify-content: center; align-items: center; height: 100vh; touch-action: none; }
+        canvas { border: 2px solid #000; background: #87CEEB; max-width: 100%; max-height: 100%; }
+    </style>
+</head>
+<body>
+    <canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = 400; canvas.height = 600;
+
+// Загрузка картинок
+const images = {};
+const assets = ['hero', 'pipe', 'bullet', 'boss', 'victory'];
+let loadedCount = 0;
+
+assets.forEach(name => {
+    images[name] = new Image();
+    images[name].src = `assets/${name}.png`;
+    images[name].onload = () => {
+        loadedCount++;
+        if (loadedCount === assets.length) console.log("Все картинки загружены!");
+    };
+});
+
+// Настройки игры
+let bird = { x: 50, y: 300, w: 60, h: 60, v: 0, g: 0.5, jump: -8 };
+let pipes = [];
+let bullets = [];
+let score = 0;
+let gameOver = false;
+
+// Прыжок
+function flap() {
+    if (gameOver) { reset(); return; }
+    bird.v = bird.jump;
+}
+
+window.addEventListener('mousedown', flap);
+window.addEventListener('touchstart', (e) => { e.preventDefault(); flap(); });
+
+function reset() {
+    bird.y = 300; bird.v = 0; pipes = []; bullets = []; score = 0; gameOver = false;
+    update();
+}
+
+function update() {
+    if (gameOver) return;
+
+    bird.v += bird.g;
+    bird.y += bird.v;
+
+    // Создание труб
+    if (Date.now() % 100 < 2 && pipes.length < 3) {
+        pipes.push({ x: 400, y: Math.random() * 300 + 100 });
+    }
+
+    pipes.forEach((p, i) => {
+        p.x -= 3;
+        // Коллизия с трубой
+        if (bird.x < p.x + 80 && bird.x + bird.w > p.x && bird.y < p.y) gameOver = true;
+        if (p.x < -100) { pipes.splice(i, 1); score++; }
+    });
+
+    if (bird.y > 600 || bird.y < 0) gameOver = true;
+
+    draw();
+    requestAnimationFrame(update);
+}
+
+function draw() {
+    ctx.clearRect(0, 0, 400, 600);
+    
+    // Птица
+    ctx.drawImage(images.hero, bird.x, bird.y, bird.w, bird.h);
+
+    // Трубы
+    pipes.forEach(p => {
+        ctx.drawImage(images.pipe, p.x, p.y, 80, 500);
+    });
+
+    // Счет
+    ctx.fillStyle = "white";
+    ctx.font = "30px Arial";
+    ctx.fillText("Счет: " + score, 20, 40);
+
+    if (gameOver) {
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(0,0,400,600);
+        ctx.drawImage(images.victory, 75, 200, 250, 250);
+        ctx.fillStyle = "white";
+        ctx.fillText("НАЖМИ, ЧТОБЫ ИГРАТЬ", 50, 500);
+    }
+}
+
+update();
+</script>
+</body>
+</html>
