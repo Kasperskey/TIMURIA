@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Zesty Bird</title>
+    <title>Zesty Bird: Boss Edition</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; display: flex; justify-content: center; align-items: center; height: 100vh; touch-action: none; }
-        canvas { background: #87CEEB; max-width: 100%; max-height: 100%; display: block; }
+        canvas { background: #87CEEB; max-width: 100%; max-height: 100%; display: block; border: 2px solid #000; }
     </style>
 </head>
 <body>
@@ -26,39 +26,94 @@
         images[name].onload = () => { loadedCount++; };
     });
 
-    let bird, pipes, score, gameOver, pipeTimer;
+    let bird, pipes, bullets, boss, score, gameOver, pipeTimer, isVictory;
 
     function reset() {
         bird = { x: 50, y: 200, w: 50, h: 50, v: 0, g: 0.25, jump: -6 };
         pipes = [];
+        bullets = [];
+        boss = null;
         score = 0;
         gameOver = false;
+        isVictory = false;
         pipeTimer = 0;
     }
 
     reset();
 
+    // Управление
     function flap() {
-        if (gameOver) { reset(); return; }
+        if (gameOver || isVictory) { reset(); return; }
         bird.v = bird.jump;
     }
 
-    window.addEventListener('mousedown', (e) => { if(e.button === 0) flap(); });
-    window.addEventListener('touchstart', (e) => { e.preventDefault(); flap(); }, {passive: false});
+    function shoot() {
+        if (!gameOver && !isVictory) {
+            bullets.push({ x: bird.x + bird.w, y: bird.y + bird.h/2 - 10, w: 40, h: 20 });
+        }
+    }
+
+    // Обработка нажатий
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') flap();
+        if (e.code === 'KeyF' || e.code === 'ControlLeft') shoot();
+    });
+
+    window.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (e.touches.length > 1) shoot(); // Два пальца - выстрел
+        else flap(); // Один палец - прыжок
+    }, {passive: false});
+
+    window.addEventListener('mousedown', (e) => {
+        if (e.button === 0) flap();
+        if (e.button === 2) shoot(); // Правая кнопка - выстрел
+    });
+
+    canvas.oncontextmenu = (e) => e.preventDefault();
 
     function update() {
-        if (gameOver) { draw(); requestAnimationFrame(update); return; }
+        if (gameOver || isVictory) { draw(); requestAnimationFrame(update); return; }
 
         bird.v += bird.g;
         bird.y += bird.v;
 
-        pipeTimer++;
-        if (pipeTimer > 120) {
-            let pipeH = Math.random() * 250 + 150; 
-            pipes.push({ x: 400, y: canvas.height - pipeH, w: 70, h: 600 });
-            pipeTimer = 0;
+        // Появление босса на 10 очках
+        if (score >= 10 && !boss) {
+            boss = { x: 450, y: 150, w: 200, h: 200, hp: 5, dir: 1 };
         }
 
+        // Логика труб (только если нет босса)
+        if (!boss) {
+            pipeTimer++;
+            if (pipeTimer > 120) {
+                let pipeH = Math.random() * 250 + 150; 
+                pipes.push({ x: 400, y: canvas.height - pipeH, w: 70, h: 600 });
+                pipeTimer = 0;
+            }
+        } else {
+            // Движение босса
+            boss.x = Math.max(180, boss.x - 2);
+            boss.y += 2 * boss.dir;
+            if (boss.y > 350 || boss.y < 50) boss.dir *= -1;
+            
+            // Столкновение с боссом
+            if (bird.x + bird.w - 10 > boss.x && bird.y + bird.h > boss.y && bird.y < boss.y + boss.h) gameOver = true;
+        }
+
+        // Пули
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            bullets[i].x += 7;
+            if (boss && bullets[i].x > boss.x && bullets[i].y > boss.y && bullets[i].y < boss.y + boss.h) {
+                boss.hp--;
+                bullets.splice(i, 1);
+                if (boss.hp <= 0) { isVictory = true; }
+                continue;
+            }
+            if (bullets[i].x > 400) bullets.splice(i, 1);
+        }
+
+        // Трубы
         for (let i = pipes.length - 1; i >= 0; i--) {
             pipes[i].x -= 2.5;
             let p = pipes[i];
@@ -76,22 +131,38 @@
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
         if (images.hero) ctx.drawImage(images.hero, bird.x, bird.y, bird.w, bird.h);
+
         pipes.forEach(p => {
             if (images.pipe) ctx.drawImage(images.pipe, p.x, p.y, p.w, p.h);
         });
+
+        bullets.forEach(b => {
+            if (images.bullet) ctx.drawImage(images.bullet, b.x, b.y, b.w, b.h);
+        });
+
+        if (boss && images.boss) {
+            ctx.drawImage(images.boss, boss.x, boss.y, boss.w, boss.h);
+            // Жизни босса
+            ctx.fillStyle = "red";
+            ctx.fillRect(boss.x, boss.y - 20, (boss.w * boss.hp) / 5, 10);
+        }
+
         ctx.fillStyle = "white";
-        ctx.font = "bold 35px Arial";
+        ctx.font = "bold 30px Arial";
         ctx.fillText("Счет: " + score, 20, 50);
 
-        if (gameOver) {
+        if (gameOver || isVictory) {
             ctx.fillStyle = "rgba(0,0,0,0.6)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             if (images.victory) ctx.drawImage(images.victory, 75, 130, 250, 250);
             ctx.fillStyle = "white";
             ctx.textAlign = "center";
             ctx.font = "bold 30px Arial";
-            ctx.fillText("ПОПРОБУЙ ЕЩЕ!", canvas.width/2, 430);
+            ctx.fillText(isVictory ? "ПОБЕДА!" : "ПОПРОБУЙ ЕЩЕ!", canvas.width/2, 430);
+            ctx.font = "20px Arial";
+            ctx.fillText("Нажми, чтобы начать заново", canvas.width/2, 470);
             ctx.textAlign = "start";
         }
     }
